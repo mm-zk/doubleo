@@ -20,3 +20,9 @@ futures = { version = "0.3", features = ["compat"] }
 
 zksync_types = { git = "https://github.com/matter-labs/zksync-era.git", rev = "e10bbdd1e863962552f37e768ae6af649353e4ea" }
 zksync_web3_decl = { git = "https://github.com/matter-labs/zksync-era.git", rev = "e10bbdd1e863962552f37e768ae6af649353e4ea", features = [ "server", "client" ] }
+tower = "0.4.13"
+tower-http = { version = "0.4.1", features = ["auth"]}
+http = "0.2.12"
+base64 = "0.13"
+hyper = "0.14"
+jsonrpsee = { version = "0.21.0", default-features = false }

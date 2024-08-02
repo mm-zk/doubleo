@@ -8,6 +8,7 @@ use zksync_types::{
     web3::{Bytes, FeeHistory, Index, SyncState},
     Address, H256, U256, U64,
 };
+use zksync_web3_decl::jsonrpsee::proc_macros::rpc;
 use zksync_web3_decl::{
     client::{Client, L2},
     jsonrpsee::{
@@ -17,6 +18,8 @@ use zksync_web3_decl::{
     namespaces::{EthNamespaceClient, EthNamespaceServer},
     types::{Block, Filter, FilterChanges, Log},
 };
+
+use zksync_web3_decl::*;
 
 #[derive(Clone)]
 pub struct Proxy {
@@ -32,6 +35,28 @@ impl Proxy {
                 panic!("Unable to create a client for fork: {}", self.sequencer_url)
             })
             .build()
+    }
+}
+
+pub struct PrivateProxy {}
+
+#[derive(Clone, Debug)]
+struct AuthInfo {
+    username: String,
+    password: String,
+}
+
+#[rpc(server, client, namespace = "eth")]
+pub trait PrivateEthNamespace {
+    #[method(name = "privateBlockNumber")]
+    async fn private_get_block_number(&self, username: String, password: String) -> RpcResult<U64>;
+}
+
+#[async_trait]
+impl PrivateEthNamespaceServer for PrivateProxy {
+    async fn private_get_block_number(&self, username: String, password: String) -> RpcResult<U64> {
+        println!("username: {:?} password: {:?}", username, password);
+        Ok(42.into())
     }
 }
 
