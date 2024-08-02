@@ -1,20 +1,73 @@
 use crate::eth::EthNamespaceT;
 
+use eyre::Context;
 use jsonrpc_core::{BoxFuture, Result};
+use std::{future::Future, pin::Pin, str::FromStr};
+use tokio::runtime::Builder;
 use zksync_types::{
     api::{BlockIdVariant, BlockNumber, Transaction, TransactionReceipt, TransactionVariant},
     transaction_request::CallRequest,
+    url::SensitiveUrl,
     web3::{Bytes, FeeHistory, Index, SyncState},
     Address, H256, U256, U64,
 };
-use zksync_web3_decl::types::{Block, Filter, FilterChanges, Log};
+use zksync_web3_decl::{
+    client::{Client, L2},
+    namespaces::EthNamespaceClient,
+    types::{Block, Filter, FilterChanges, Log},
+};
+
+pub(crate) trait IntoBoxedFuture: Sized + Send + 'static {
+    fn into_boxed_future(self) -> Pin<Box<dyn Future<Output = Self> + Send>> {
+        Box::pin(async { self })
+    }
+}
+
+impl<T, U> IntoBoxedFuture for std::result::Result<T, U>
+where
+    T: Send + 'static,
+    U: Send + 'static,
+{
+}
 
 #[derive(Clone)]
-pub struct Proxy {}
+pub struct Proxy {
+    pub sequencer_url: String,
+}
+
+impl Proxy {
+    pub fn create_client(&self) -> Client<L2> {
+        let url = SensitiveUrl::from_str(&self.sequencer_url)
+            .unwrap_or_else(|_| panic!("Unable to parse client URL: {}", &self.sequencer_url));
+        Client::http(url)
+            .unwrap_or_else(|_| {
+                panic!("Unable to create a client for fork: {}", self.sequencer_url)
+            })
+            .build()
+    }
+}
+
+pub fn block_on<F: Future + Send + 'static>(future: F) -> F::Output
+where
+    F::Output: Send,
+{
+    std::thread::spawn(move || {
+        let runtime = Builder::new_current_thread()
+            .enable_all()
+            .build()
+            .expect("tokio runtime creation failed");
+        runtime.block_on(future)
+    })
+    .join()
+    .unwrap()
+}
 
 impl EthNamespaceT for Proxy {
     fn get_block_number(&self) -> BoxFuture<Result<U64>> {
-        todo!()
+        let client = self.create_client();
+        block_on(async move { client.get_block_number().await })
+            .map_err(|_| jsonrpc_core::Error::internal_error())
+            .into_boxed_future()
     }
 
     fn chain_id(&self) -> BoxFuture<Result<U64>> {

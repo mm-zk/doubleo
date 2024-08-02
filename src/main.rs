@@ -95,7 +95,9 @@ async fn main() -> eyre::Result<()> {
     println!("config: {:?}", config);
     tracing_subscriber::fmt::init();
 
-    let proxy = Proxy {};
+    let proxy = Proxy {
+        sequencer_url: opt.sequencer_url,
+    };
 
     let threads = build_json_http(
         SocketAddr::new(IpAddr::V4(Ipv4Addr::new(0, 0, 0, 0)), opt.port),
