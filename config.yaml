@@ -1,0 +1,3 @@
+"allow_contract_creation": true
+"contract_call_whitelist":
+- "contract1"
