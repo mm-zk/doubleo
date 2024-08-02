@@ -5,11 +5,9 @@ use std::{
 
 use clap::{Parser, Subcommand};
 use futures::{channel::oneshot, future, FutureExt};
-use jsonrpc_core::{MetaIoHandler, Metadata};
 use serde::{Deserialize, Serialize};
-
-mod eth;
-use crate::eth::EthNamespaceT;
+use zksync_web3_decl::jsonrpsee::server::ServerBuilder;
+use zksync_web3_decl::{jsonrpsee::RpcModule, namespaces::EthNamespaceServer};
 
 mod proxy;
 use crate::proxy::Proxy;
@@ -54,39 +52,6 @@ fn parse_config(path: &str) -> eyre::Result<Config> {
     return Ok(config);
 }
 
-#[derive(Clone, Debug, Default)]
-pub struct Meta();
-impl Metadata for Meta {}
-
-#[allow(clippy::too_many_arguments)]
-async fn build_json_http(addr: SocketAddr, proxy: Proxy) -> tokio::task::JoinHandle<()> {
-    let (sender, recv) = oneshot::channel::<()>();
-
-    let io_handler = {
-        let mut io: MetaIoHandler<Meta> = MetaIoHandler::default();
-        io.extend_with(EthNamespaceT::to_delegate(proxy.clone()));
-        io
-    };
-
-    std::thread::spawn(move || {
-        let runtime = tokio::runtime::Builder::new_multi_thread()
-            .enable_all()
-            .worker_threads(1)
-            .build()
-            .unwrap();
-
-        let server = jsonrpc_http_server::ServerBuilder::new(io_handler)
-            .threads(1)
-            .event_loop_executor(runtime.handle().clone())
-            .start_http(&addr)
-            .unwrap();
-        server.wait();
-        let _ = sender.send(());
-    });
-
-    tokio::spawn(recv.map(drop))
-}
-
 #[tokio::main]
 async fn main() -> eyre::Result<()> {
     let opt = Cli::parse();
@@ -99,16 +64,25 @@ async fn main() -> eyre::Result<()> {
         sequencer_url: opt.sequencer_url,
     };
 
-    let threads = build_json_http(
-        SocketAddr::new(IpAddr::V4(Ipv4Addr::new(0, 0, 0, 0)), opt.port),
-        proxy,
-    )
-    .await;
+    let mut rpc = RpcModule::new(());
+    rpc.merge(proxy.into_rpc()).unwrap();
+
+    // Create the server with custom middleware
+    let builder = ServerBuilder::default();
+    let server = builder
+        .http_only()
+        .build(format!("127.0.0.1:{:?}", opt.port))
+        .await
+        .unwrap();
+
+    let handle = server.start(rpc);
 
     tracing::info!("========================================");
     tracing::info!("  Node is ready at 127.0.0.1:{}", opt.port);
     tracing::info!("========================================");
 
-    future::select_all(vec![threads]).await.0.unwrap();
+    // Wait for the server to finish
+    handle.stopped().await;
+
     Ok(())
 }
