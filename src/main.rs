@@ -1,41 +1,15 @@
-use std::{
-    borrow::Cow,
-    fs,
-    net::{IpAddr, Ipv4Addr, SocketAddr},
-};
+use std::fs;
 
 use clap::{Parser, Subcommand};
-use futures::{channel::oneshot, future, FutureExt};
 use middleware::AuthMiddlewareLayer;
 use proxy::{PrivateEthNamespaceServer, PrivateProxy};
 use serde::{Deserialize, Serialize};
-use serde_json::{json, value::RawValue, Value};
-use tower::Service;
-use tower_http::validate_request::ValidateRequestHeaderLayer;
-use zksync_web3_decl::jsonrpsee::{
-    core::async_trait,
-    server::{ServerBuilder, TowerServiceBuilder},
-};
+use whitelist::ContractWhitelist;
+use zksync_web3_decl::jsonrpsee::server::ServerBuilder;
 use zksync_web3_decl::{jsonrpsee::RpcModule, namespaces::EthNamespaceServer};
-
 mod proxy;
+mod whitelist;
 use crate::proxy::Proxy;
-use base64::decode;
-use futures::future::BoxFuture;
-use hyper::{Body, Request, Response};
-use std::pin::Pin;
-use std::sync::Arc;
-use std::task::{Context, Poll};
-use tower::Layer;
-use tracing::{info, Level};
-use tracing_subscriber::FmtSubscriber;
-
-use zksync_web3_decl::jsonrpsee::http_client::types::Request as JsonRpcRequest;
-//use zksync_web3_decl::jsonrpsee::http_server::{
-//    HttpServerBuilder, HttpServerMiddleware, Request as JsonRpcRequest, Response as JsonRpcResponse,
-//};
-use zksync_web3_decl::jsonrpsee::proc_macros::rpc;
-use zksync_web3_decl::jsonrpsee::types::Params;
 
 mod middleware;
 #[derive(Debug, Parser)]
@@ -88,6 +62,7 @@ async fn main() -> eyre::Result<()> {
 
     let proxy = Proxy {
         sequencer_url: opt.sequencer_url.clone(),
+        whitelist: ContractWhitelist::init(config.contract_call_whitelist),
     };
 
     let private_proxy = PrivateProxy {

@@ -21,9 +21,12 @@ use zksync_web3_decl::{
 
 use zksync_web3_decl::*;
 
+use crate::whitelist::ContractWhitelist;
+
 #[derive(Clone)]
 pub struct Proxy {
     pub sequencer_url: String,
+    pub whitelist: ContractWhitelist,
 }
 
 impl Proxy {
@@ -35,6 +38,11 @@ impl Proxy {
                 panic!("Unable to create a client for fork: {}", self.sequencer_url)
             })
             .build()
+    }
+
+    // Whether to allow this 'call' request to go through.
+    pub fn allow_unauthorized_call(&self, req: &CallRequest) -> bool {
+        self.whitelist.allow_unauthorized_call(req)
     }
 }
 
@@ -100,663 +108,306 @@ impl EthNamespaceServer for Proxy {
             .map_err(|_| ErrorObject::from(ErrorCode::InternalError).into_owned())
     }
 
-    #[must_use]
-    #[allow(clippy::type_complexity, clippy::type_repetition_in_bounds)]
-    fn chain_id<'life0, 'async_trait>(
-        &'life0 self,
-    ) -> ::core::pin::Pin<
-        Box<
-            dyn ::core::future::Future<Output = RpcResult<U64>>
-                + ::core::marker::Send
-                + 'async_trait,
-        >,
-    >
-    where
-        'life0: 'async_trait,
-        Self: 'async_trait,
-    {
-        todo!()
+    async fn chain_id(&self) -> RpcResult<U64> {
+        let client = self.create_client();
+        client
+            .chain_id()
+            .await
+            .map_err(|_| ErrorObject::from(ErrorCode::InternalError).into_owned())
     }
 
-    #[must_use]
-    #[allow(clippy::type_complexity, clippy::type_repetition_in_bounds)]
-    fn call<'life0, 'async_trait>(
-        &'life0 self,
-        req: CallRequest,
-        block: Option<BlockIdVariant>,
-    ) -> ::core::pin::Pin<
-        Box<
-            dyn ::core::future::Future<Output = RpcResult<Bytes>>
-                + ::core::marker::Send
-                + 'async_trait,
-        >,
-    >
-    where
-        'life0: 'async_trait,
-        Self: 'async_trait,
-    {
-        todo!()
+    async fn call(&self, req: CallRequest, block: Option<BlockIdVariant>) -> RpcResult<Bytes> {
+        if !self.allow_unauthorized_call(&req) {
+            return Err(ErrorObject::from(ErrorCode::ServerError(403)));
+        }
+        let client = self.create_client();
+        client
+            .call(req, block)
+            .await
+            .map_err(|_| ErrorObject::from(ErrorCode::InternalError).into_owned())
     }
 
-    #[must_use]
-    #[allow(clippy::type_complexity, clippy::type_repetition_in_bounds)]
-    fn estimate_gas<'life0, 'async_trait>(
-        &'life0 self,
-        req: CallRequest,
-        _block: Option<BlockNumber>,
-    ) -> ::core::pin::Pin<
-        Box<
-            dyn ::core::future::Future<Output = RpcResult<U256>>
-                + ::core::marker::Send
-                + 'async_trait,
-        >,
-    >
-    where
-        'life0: 'async_trait,
-        Self: 'async_trait,
-    {
-        todo!()
+    async fn estimate_gas(&self, req: CallRequest, block: Option<BlockNumber>) -> RpcResult<U256> {
+        if !self.allow_unauthorized_call(&req) {
+            return Err(ErrorObject::from(ErrorCode::ServerError(403)));
+        }
+        let client = self.create_client();
+        client
+            .estimate_gas(req, block)
+            .await
+            .map_err(|_| ErrorObject::from(ErrorCode::InternalError).into_owned())
     }
 
-    #[must_use]
-    #[allow(clippy::type_complexity, clippy::type_repetition_in_bounds)]
-    fn gas_price<'life0, 'async_trait>(
-        &'life0 self,
-    ) -> ::core::pin::Pin<
-        Box<
-            dyn ::core::future::Future<Output = RpcResult<U256>>
-                + ::core::marker::Send
-                + 'async_trait,
-        >,
-    >
-    where
-        'life0: 'async_trait,
-        Self: 'async_trait,
-    {
-        todo!()
+    async fn gas_price(&self) -> RpcResult<U256> {
+        let client = self.create_client();
+        client
+            .gas_price()
+            .await
+            .map_err(|_| ErrorObject::from(ErrorCode::InternalError).into_owned())
     }
 
-    #[must_use]
-    #[allow(clippy::type_complexity, clippy::type_repetition_in_bounds)]
-    fn new_filter<'life0, 'async_trait>(
-        &'life0 self,
-        filter: Filter,
-    ) -> ::core::pin::Pin<
-        Box<
-            dyn ::core::future::Future<Output = RpcResult<U256>>
-                + ::core::marker::Send
-                + 'async_trait,
-        >,
-    >
-    where
-        'life0: 'async_trait,
-        Self: 'async_trait,
-    {
-        todo!()
+    async fn new_filter(&self, _filter: Filter) -> RpcResult<U256> {
+        Err(ErrorObject::from(ErrorCode::ServerError(403)))
     }
 
-    #[must_use]
-    #[allow(clippy::type_complexity, clippy::type_repetition_in_bounds)]
-    fn new_block_filter<'life0, 'async_trait>(
-        &'life0 self,
-    ) -> ::core::pin::Pin<
-        Box<
-            dyn ::core::future::Future<Output = RpcResult<U256>>
-                + ::core::marker::Send
-                + 'async_trait,
-        >,
-    >
-    where
-        'life0: 'async_trait,
-        Self: 'async_trait,
-    {
-        todo!()
+    async fn new_block_filter(&self) -> RpcResult<U256> {
+        Err(ErrorObject::from(ErrorCode::ServerError(403)))
     }
 
-    #[must_use]
-    #[allow(clippy::type_complexity, clippy::type_repetition_in_bounds)]
-    fn uninstall_filter<'life0, 'async_trait>(
-        &'life0 self,
-        idx: U256,
-    ) -> ::core::pin::Pin<
-        Box<
-            dyn ::core::future::Future<Output = RpcResult<bool>>
-                + ::core::marker::Send
-                + 'async_trait,
-        >,
-    >
-    where
-        'life0: 'async_trait,
-        Self: 'async_trait,
-    {
-        todo!()
+    async fn uninstall_filter(&self, _idx: U256) -> RpcResult<bool> {
+        Err(ErrorObject::from(ErrorCode::ServerError(403)))
     }
 
-    #[must_use]
-    #[allow(clippy::type_complexity, clippy::type_repetition_in_bounds)]
-    fn new_pending_transaction_filter<'life0, 'async_trait>(
-        &'life0 self,
-    ) -> ::core::pin::Pin<
-        Box<
-            dyn ::core::future::Future<Output = RpcResult<U256>>
-                + ::core::marker::Send
-                + 'async_trait,
-        >,
-    >
-    where
-        'life0: 'async_trait,
-        Self: 'async_trait,
-    {
-        todo!()
+    async fn new_pending_transaction_filter(&self) -> RpcResult<U256> {
+        Err(ErrorObject::from(ErrorCode::ServerError(403)))
     }
 
-    #[must_use]
-    #[allow(clippy::type_complexity, clippy::type_repetition_in_bounds)]
-    fn get_logs<'life0, 'async_trait>(
-        &'life0 self,
-        filter: Filter,
-    ) -> ::core::pin::Pin<
-        Box<
-            dyn ::core::future::Future<Output = RpcResult<Vec<Log>>>
-                + ::core::marker::Send
-                + 'async_trait,
-        >,
-    >
-    where
-        'life0: 'async_trait,
-        Self: 'async_trait,
-    {
-        todo!()
+    async fn get_logs(&self, _filter: Filter) -> RpcResult<Vec<Log>> {
+        Err(ErrorObject::from(ErrorCode::ServerError(403)))
     }
 
-    #[must_use]
-    #[allow(clippy::type_complexity, clippy::type_repetition_in_bounds)]
-    fn get_filter_logs<'life0, 'async_trait>(
-        &'life0 self,
-        filter_index: U256,
-    ) -> ::core::pin::Pin<
-        Box<
-            dyn ::core::future::Future<Output = RpcResult<FilterChanges>>
-                + ::core::marker::Send
-                + 'async_trait,
-        >,
-    >
-    where
-        'life0: 'async_trait,
-        Self: 'async_trait,
-    {
-        todo!()
+    async fn get_filter_logs(&self, _filter_index: U256) -> RpcResult<FilterChanges> {
+        Err(ErrorObject::from(ErrorCode::ServerError(403)))
     }
-
-    #[must_use]
-    #[allow(clippy::type_complexity, clippy::type_repetition_in_bounds)]
-    fn get_filter_changes<'life0, 'async_trait>(
-        &'life0 self,
-        filter_index: U256,
-    ) -> ::core::pin::Pin<
-        Box<
-            dyn ::core::future::Future<Output = RpcResult<FilterChanges>>
-                + ::core::marker::Send
-                + 'async_trait,
-        >,
-    >
-    where
-        'life0: 'async_trait,
-        Self: 'async_trait,
-    {
-        todo!()
+    async fn get_filter_changes(&self, _filter_index: U256) -> RpcResult<FilterChanges> {
+        Err(ErrorObject::from(ErrorCode::ServerError(403)))
     }
 
     async fn get_balance(
         &self,
+        _address: Address,
+        _block: Option<BlockIdVariant>,
+    ) -> RpcResult<U256> {
+        Err(ErrorObject::from(ErrorCode::ServerError(403)))
+    }
+
+    async fn get_block_by_number(
+        &self,
+        block_number: BlockNumber,
+        full_transactions: bool,
+    ) -> RpcResult<Option<Block<TransactionVariant>>> {
+        if full_transactions {
+            return Err(ErrorObject::from(ErrorCode::ServerError(403)));
+        }
+        let client = self.create_client();
+        let mut result = client
+            .get_block_by_number(block_number, full_transactions)
+            .await
+            .map_err(|_| ErrorObject::from(ErrorCode::InternalError).into_owned());
+
+        // Filter out transactions
+        if let Ok(result_details) = &mut result {
+            if let Some(block) = result_details {
+                block.transactions.clear();
+            }
+        }
+        result
+    }
+
+    async fn get_block_by_hash(
+        &self,
+        hash: H256,
+        full_transactions: bool,
+    ) -> RpcResult<Option<Block<TransactionVariant>>> {
+        if full_transactions {
+            return Err(ErrorObject::from(ErrorCode::ServerError(403)));
+        }
+        let client = self.create_client();
+        let mut result = client
+            .get_block_by_hash(hash, full_transactions)
+            .await
+            .map_err(|_| ErrorObject::from(ErrorCode::InternalError).into_owned());
+
+        // Filter out transactions
+        if let Ok(result_details) = &mut result {
+            if let Some(block) = result_details {
+                block.transactions.clear();
+            }
+        }
+        result
+    }
+
+    async fn get_block_transaction_count_by_number(
+        &self,
+        block_number: BlockNumber,
+    ) -> RpcResult<Option<U256>> {
+        let client = self.create_client();
+        client
+            .get_block_transaction_count_by_number(block_number)
+            .await
+            .map_err(|_| ErrorObject::from(ErrorCode::InternalError).into_owned())
+    }
+
+    async fn get_block_receipts(
+        &self,
+        block_id: BlockId,
+    ) -> RpcResult<Option<Vec<TransactionReceipt>>> {
+        Err(ErrorObject::from(ErrorCode::ServerError(403)))
+    }
+
+    async fn get_block_transaction_count_by_hash(
+        &self,
+        block_hash: H256,
+    ) -> RpcResult<Option<U256>> {
+        let client = self.create_client();
+        client
+            .get_block_transaction_count_by_hash(block_hash)
+            .await
+            .map_err(|_| ErrorObject::from(ErrorCode::InternalError).into_owned())
+    }
+
+    async fn get_code(&self, address: Address, block: Option<BlockIdVariant>) -> RpcResult<Bytes> {
+        let client = self.create_client();
+        client
+            .get_code(address, block)
+            .await
+            .map_err(|_| ErrorObject::from(ErrorCode::InternalError).into_owned())
+    }
+
+    // Storage is hard one.. for now not allowed.
+    async fn get_storage_at(
+        &self,
+        _address: Address,
+        _idx: U256,
+        _block: Option<BlockIdVariant>,
+    ) -> RpcResult<H256> {
+        Err(ErrorObject::from(ErrorCode::ServerError(403)))
+    }
+
+    // Transaction count is ok.
+    async fn get_transaction_count(
+        &self,
         address: Address,
         block: Option<BlockIdVariant>,
     ) -> RpcResult<U256> {
-        Err(ErrorObject::from(ErrorCode::ServerError(403)))
-        /*let client = self.create_client();
+        let client = self.create_client();
         client
-            .get_balance(address, block)
+            .get_transaction_count(address, block)
             .await
-            .map_err(|_| ErrorObject::from(ErrorCode::InternalError).into_owned())*/
+            .map_err(|_| ErrorObject::from(ErrorCode::InternalError).into_owned())
     }
 
-    #[must_use]
-    #[allow(clippy::type_complexity, clippy::type_repetition_in_bounds)]
-    fn get_block_by_number<'life0, 'async_trait>(
-        &'life0 self,
-        block_number: BlockNumber,
-        full_transactions: bool,
-    ) -> ::core::pin::Pin<
-        Box<
-            dyn ::core::future::Future<Output = RpcResult<Option<Block<TransactionVariant>>>>
-                + ::core::marker::Send
-                + 'async_trait,
-        >,
-    >
-    where
-        'life0: 'async_trait,
-        Self: 'async_trait,
-    {
-        todo!()
+    async fn get_transaction_by_hash(&self, hash: H256) -> RpcResult<Option<Transaction>> {
+        let client = self.create_client();
+        client
+            .get_transaction_by_hash(hash)
+            .await
+            .map_err(|_| ErrorObject::from(ErrorCode::InternalError).into_owned())
     }
 
-    #[must_use]
-    #[allow(clippy::type_complexity, clippy::type_repetition_in_bounds)]
-    fn get_block_by_hash<'life0, 'async_trait>(
-        &'life0 self,
-        hash: H256,
-        full_transactions: bool,
-    ) -> ::core::pin::Pin<
-        Box<
-            dyn ::core::future::Future<Output = RpcResult<Option<Block<TransactionVariant>>>>
-                + ::core::marker::Send
-                + 'async_trait,
-        >,
-    >
-    where
-        'life0: 'async_trait,
-        Self: 'async_trait,
-    {
-        todo!()
+    // Listing block transactions is not allowed.
+    async fn get_transaction_by_block_hash_and_index(
+        &self,
+        _block_hash: H256,
+        _index: Index,
+    ) -> RpcResult<Option<Transaction>> {
+        Err(ErrorObject::from(ErrorCode::ServerError(403)))
     }
 
-    #[must_use]
-    #[allow(clippy::type_complexity, clippy::type_repetition_in_bounds)]
-    fn get_block_transaction_count_by_number<'life0, 'async_trait>(
-        &'life0 self,
-        block_number: BlockNumber,
-    ) -> ::core::pin::Pin<
-        Box<
-            dyn ::core::future::Future<Output = RpcResult<Option<U256>>>
-                + ::core::marker::Send
-                + 'async_trait,
-        >,
-    >
-    where
-        'life0: 'async_trait,
-        Self: 'async_trait,
-    {
-        todo!()
+    // Listing block transactions is not allowed
+    async fn get_transaction_by_block_number_and_index(
+        &self,
+        _block_number: BlockNumber,
+        _index: Index,
+    ) -> RpcResult<Option<Transaction>> {
+        Err(ErrorObject::from(ErrorCode::ServerError(403)))
     }
 
-    #[must_use]
-    #[allow(clippy::type_complexity, clippy::type_repetition_in_bounds)]
-    fn get_block_receipts<'life0, 'async_trait>(
-        &'life0 self,
-        block_id: BlockId,
-    ) -> ::core::pin::Pin<
-        Box<
-            dyn ::core::future::Future<Output = RpcResult<Option<Vec<TransactionReceipt>>>>
-                + ::core::marker::Send
-                + 'async_trait,
-        >,
-    >
-    where
-        'life0: 'async_trait,
-        Self: 'async_trait,
-    {
-        todo!()
+    // Tx receipt is allowed - if you know the hash.
+    async fn get_transaction_receipt(&self, hash: H256) -> RpcResult<Option<TransactionReceipt>> {
+        let client = self.create_client();
+        client
+            .get_transaction_receipt(hash)
+            .await
+            .map_err(|_| ErrorObject::from(ErrorCode::InternalError).into_owned())
     }
 
-    #[must_use]
-    #[allow(clippy::type_complexity, clippy::type_repetition_in_bounds)]
-    fn get_block_transaction_count_by_hash<'life0, 'async_trait>(
-        &'life0 self,
-        block_hash: H256,
-    ) -> ::core::pin::Pin<
-        Box<
-            dyn ::core::future::Future<Output = RpcResult<Option<U256>>>
-                + ::core::marker::Send
-                + 'async_trait,
-        >,
-    >
-    where
-        'life0: 'async_trait,
-        Self: 'async_trait,
-    {
-        todo!()
+    async fn protocol_version(&self) -> RpcResult<String> {
+        let client = self.create_client();
+        client
+            .protocol_version()
+            .await
+            .map_err(|_| ErrorObject::from(ErrorCode::InternalError).into_owned())
     }
 
-    #[must_use]
-    #[allow(clippy::type_complexity, clippy::type_repetition_in_bounds)]
-    fn get_code<'life0, 'async_trait>(
-        &'life0 self,
-        address: Address,
-        block: Option<BlockIdVariant>,
-    ) -> ::core::pin::Pin<
-        Box<
-            dyn ::core::future::Future<Output = RpcResult<Bytes>>
-                + ::core::marker::Send
-                + 'async_trait,
-        >,
-    >
-    where
-        'life0: 'async_trait,
-        Self: 'async_trait,
-    {
-        todo!()
+    // Sending raw transactions is allowed.
+    async fn send_raw_transaction(&self, tx_bytes: Bytes) -> RpcResult<H256> {
+        let client = self.create_client();
+        client
+            .send_raw_transaction(tx_bytes)
+            .await
+            .map_err(|_| ErrorObject::from(ErrorCode::InternalError).into_owned())
     }
 
-    #[must_use]
-    #[allow(clippy::type_complexity, clippy::type_repetition_in_bounds)]
-    fn get_storage_at<'life0, 'async_trait>(
-        &'life0 self,
-        address: Address,
-        idx: U256,
-        block: Option<BlockIdVariant>,
-    ) -> ::core::pin::Pin<
-        Box<
-            dyn ::core::future::Future<Output = RpcResult<H256>>
-                + ::core::marker::Send
-                + 'async_trait,
-        >,
-    >
-    where
-        'life0: 'async_trait,
-        Self: 'async_trait,
-    {
-        todo!()
+    async fn syncing(&self) -> RpcResult<SyncState> {
+        let client = self.create_client();
+        client
+            .syncing()
+            .await
+            .map_err(|_| ErrorObject::from(ErrorCode::InternalError).into_owned())
     }
 
-    #[must_use]
-    #[allow(clippy::type_complexity, clippy::type_repetition_in_bounds)]
-    fn get_transaction_count<'life0, 'async_trait>(
-        &'life0 self,
-        address: Address,
-        block: Option<BlockIdVariant>,
-    ) -> ::core::pin::Pin<
-        Box<
-            dyn ::core::future::Future<Output = RpcResult<U256>>
-                + ::core::marker::Send
-                + 'async_trait,
-        >,
-    >
-    where
-        'life0: 'async_trait,
-        Self: 'async_trait,
-    {
-        todo!()
+    async fn accounts(&self) -> RpcResult<Vec<Address>> {
+        Err(ErrorObject::from(ErrorCode::ServerError(403)))
     }
 
-    #[must_use]
-    #[allow(clippy::type_complexity, clippy::type_repetition_in_bounds)]
-    fn get_transaction_by_hash<'life0, 'async_trait>(
-        &'life0 self,
-        hash: H256,
-    ) -> ::core::pin::Pin<
-        Box<
-            dyn ::core::future::Future<Output = RpcResult<Option<Transaction>>>
-                + ::core::marker::Send
-                + 'async_trait,
-        >,
-    >
-    where
-        'life0: 'async_trait,
-        Self: 'async_trait,
-    {
-        todo!()
+    async fn coinbase(&self) -> RpcResult<Address> {
+        let client = self.create_client();
+        client
+            .coinbase()
+            .await
+            .map_err(|_| ErrorObject::from(ErrorCode::InternalError).into_owned())
     }
 
-    #[must_use]
-    #[allow(clippy::type_complexity, clippy::type_repetition_in_bounds)]
-    fn get_transaction_by_block_hash_and_index<'life0, 'async_trait>(
-        &'life0 self,
-        block_hash: H256,
-        index: Index,
-    ) -> ::core::pin::Pin<
-        Box<
-            dyn ::core::future::Future<Output = RpcResult<Option<Transaction>>>
-                + ::core::marker::Send
-                + 'async_trait,
-        >,
-    >
-    where
-        'life0: 'async_trait,
-        Self: 'async_trait,
-    {
-        todo!()
+    async fn compilers(&self) -> RpcResult<Vec<String>> {
+        let client = self.create_client();
+        client
+            .compilers()
+            .await
+            .map_err(|_| ErrorObject::from(ErrorCode::InternalError).into_owned())
     }
 
-    #[must_use]
-    #[allow(clippy::type_complexity, clippy::type_repetition_in_bounds)]
-    fn get_transaction_by_block_number_and_index<'life0, 'async_trait>(
-        &'life0 self,
-        block_number: BlockNumber,
-        index: Index,
-    ) -> ::core::pin::Pin<
-        Box<
-            dyn ::core::future::Future<Output = RpcResult<Option<Transaction>>>
-                + ::core::marker::Send
-                + 'async_trait,
-        >,
-    >
-    where
-        'life0: 'async_trait,
-        Self: 'async_trait,
-    {
-        todo!()
+    async fn hashrate(&self) -> RpcResult<U256> {
+        let client = self.create_client();
+        client
+            .hashrate()
+            .await
+            .map_err(|_| ErrorObject::from(ErrorCode::InternalError).into_owned())
     }
 
-    #[must_use]
-    #[allow(clippy::type_complexity, clippy::type_repetition_in_bounds)]
-    fn get_transaction_receipt<'life0, 'async_trait>(
-        &'life0 self,
-        hash: H256,
-    ) -> ::core::pin::Pin<
-        Box<
-            dyn ::core::future::Future<Output = RpcResult<Option<TransactionReceipt>>>
-                + ::core::marker::Send
-                + 'async_trait,
-        >,
-    >
-    where
-        'life0: 'async_trait,
-        Self: 'async_trait,
-    {
-        todo!()
+    async fn get_uncle_count_by_block_hash(&self, hash: H256) -> RpcResult<Option<U256>> {
+        let client = self.create_client();
+        client
+            .get_uncle_count_by_block_hash(hash)
+            .await
+            .map_err(|_| ErrorObject::from(ErrorCode::InternalError).into_owned())
     }
 
-    #[must_use]
-    #[allow(clippy::type_complexity, clippy::type_repetition_in_bounds)]
-    fn protocol_version<'life0, 'async_trait>(
-        &'life0 self,
-    ) -> ::core::pin::Pin<
-        Box<
-            dyn ::core::future::Future<Output = RpcResult<String>>
-                + ::core::marker::Send
-                + 'async_trait,
-        >,
-    >
-    where
-        'life0: 'async_trait,
-        Self: 'async_trait,
-    {
-        todo!()
-    }
-
-    #[must_use]
-    #[allow(clippy::type_complexity, clippy::type_repetition_in_bounds)]
-    fn send_raw_transaction<'life0, 'async_trait>(
-        &'life0 self,
-        tx_bytes: Bytes,
-    ) -> ::core::pin::Pin<
-        Box<
-            dyn ::core::future::Future<Output = RpcResult<H256>>
-                + ::core::marker::Send
-                + 'async_trait,
-        >,
-    >
-    where
-        'life0: 'async_trait,
-        Self: 'async_trait,
-    {
-        todo!()
-    }
-
-    #[must_use]
-    #[allow(clippy::type_complexity, clippy::type_repetition_in_bounds)]
-    fn syncing<'life0, 'async_trait>(
-        &'life0 self,
-    ) -> ::core::pin::Pin<
-        Box<
-            dyn ::core::future::Future<Output = RpcResult<SyncState>>
-                + ::core::marker::Send
-                + 'async_trait,
-        >,
-    >
-    where
-        'life0: 'async_trait,
-        Self: 'async_trait,
-    {
-        todo!()
-    }
-
-    #[must_use]
-    #[allow(clippy::type_complexity, clippy::type_repetition_in_bounds)]
-    fn accounts<'life0, 'async_trait>(
-        &'life0 self,
-    ) -> ::core::pin::Pin<
-        Box<
-            dyn ::core::future::Future<Output = RpcResult<Vec<Address>>>
-                + ::core::marker::Send
-                + 'async_trait,
-        >,
-    >
-    where
-        'life0: 'async_trait,
-        Self: 'async_trait,
-    {
-        todo!()
-    }
-
-    #[must_use]
-    #[allow(clippy::type_complexity, clippy::type_repetition_in_bounds)]
-    fn coinbase<'life0, 'async_trait>(
-        &'life0 self,
-    ) -> ::core::pin::Pin<
-        Box<
-            dyn ::core::future::Future<Output = RpcResult<Address>>
-                + ::core::marker::Send
-                + 'async_trait,
-        >,
-    >
-    where
-        'life0: 'async_trait,
-        Self: 'async_trait,
-    {
-        todo!()
-    }
-
-    #[must_use]
-    #[allow(clippy::type_complexity, clippy::type_repetition_in_bounds)]
-    fn compilers<'life0, 'async_trait>(
-        &'life0 self,
-    ) -> ::core::pin::Pin<
-        Box<
-            dyn ::core::future::Future<Output = RpcResult<Vec<String>>>
-                + ::core::marker::Send
-                + 'async_trait,
-        >,
-    >
-    where
-        'life0: 'async_trait,
-        Self: 'async_trait,
-    {
-        todo!()
-    }
-
-    #[must_use]
-    #[allow(clippy::type_complexity, clippy::type_repetition_in_bounds)]
-    fn hashrate<'life0, 'async_trait>(
-        &'life0 self,
-    ) -> ::core::pin::Pin<
-        Box<
-            dyn ::core::future::Future<Output = RpcResult<U256>>
-                + ::core::marker::Send
-                + 'async_trait,
-        >,
-    >
-    where
-        'life0: 'async_trait,
-        Self: 'async_trait,
-    {
-        todo!()
-    }
-
-    #[must_use]
-    #[allow(clippy::type_complexity, clippy::type_repetition_in_bounds)]
-    fn get_uncle_count_by_block_hash<'life0, 'async_trait>(
-        &'life0 self,
-        hash: H256,
-    ) -> ::core::pin::Pin<
-        Box<
-            dyn ::core::future::Future<Output = RpcResult<Option<U256>>>
-                + ::core::marker::Send
-                + 'async_trait,
-        >,
-    >
-    where
-        'life0: 'async_trait,
-        Self: 'async_trait,
-    {
-        todo!()
-    }
-
-    #[must_use]
-    #[allow(clippy::type_complexity, clippy::type_repetition_in_bounds)]
-    fn get_uncle_count_by_block_number<'life0, 'async_trait>(
-        &'life0 self,
+    async fn get_uncle_count_by_block_number(
+        &self,
         number: BlockNumber,
-    ) -> ::core::pin::Pin<
-        Box<
-            dyn ::core::future::Future<Output = RpcResult<Option<U256>>>
-                + ::core::marker::Send
-                + 'async_trait,
-        >,
-    >
-    where
-        'life0: 'async_trait,
-        Self: 'async_trait,
-    {
-        todo!()
+    ) -> RpcResult<Option<U256>> {
+        let client = self.create_client();
+        client
+            .get_uncle_count_by_block_number(number)
+            .await
+            .map_err(|_| ErrorObject::from(ErrorCode::InternalError).into_owned())
     }
 
-    #[must_use]
-    #[allow(clippy::type_complexity, clippy::type_repetition_in_bounds)]
-    fn mining<'life0, 'async_trait>(
-        &'life0 self,
-    ) -> ::core::pin::Pin<
-        Box<
-            dyn ::core::future::Future<Output = RpcResult<bool>>
-                + ::core::marker::Send
-                + 'async_trait,
-        >,
-    >
-    where
-        'life0: 'async_trait,
-        Self: 'async_trait,
-    {
-        todo!()
+    async fn mining(&self) -> RpcResult<bool> {
+        Err(ErrorObject::from(ErrorCode::ServerError(403)))
     }
 
-    #[must_use]
-    #[allow(clippy::type_complexity, clippy::type_repetition_in_bounds)]
-    fn fee_history<'life0, 'async_trait>(
-        &'life0 self,
+    async fn fee_history(
+        &self,
         block_count: U64,
         newest_block: BlockNumber,
         reward_percentiles: Vec<f32>,
-    ) -> ::core::pin::Pin<
-        Box<
-            dyn ::core::future::Future<Output = RpcResult<FeeHistory>>
-                + ::core::marker::Send
-                + 'async_trait,
-        >,
-    >
-    where
-        'life0: 'async_trait,
-        Self: 'async_trait,
-    {
-        todo!()
+    ) -> RpcResult<FeeHistory> {
+        let client = self.create_client();
+        client
+            .fee_history(block_count, newest_block, reward_percentiles)
+            .await
+            .map_err(|_| ErrorObject::from(ErrorCode::InternalError).into_owned())
     }
 }
