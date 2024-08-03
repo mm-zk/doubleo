@@ -54,12 +54,6 @@ impl PrivateProxy {
     }
 }
 
-#[derive(Clone, Debug)]
-struct AuthInfo {
-    username: String,
-    password: String,
-}
-
 #[rpc(server, client, namespace = "privateeth")]
 pub trait PrivateEthNamespace {
     #[method(name = "blockNumber")]
@@ -318,11 +312,12 @@ impl EthNamespaceServer for Proxy {
         address: Address,
         block: Option<BlockIdVariant>,
     ) -> RpcResult<U256> {
-        let client = self.create_client();
+        Err(ErrorObject::from(ErrorCode::ServerError(403)))
+        /*let client = self.create_client();
         client
             .get_balance(address, block)
             .await
-            .map_err(|_| ErrorObject::from(ErrorCode::InternalError).into_owned())
+            .map_err(|_| ErrorObject::from(ErrorCode::InternalError).into_owned())*/
     }
 
     #[must_use]
