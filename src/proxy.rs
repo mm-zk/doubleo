@@ -38,7 +38,21 @@ impl Proxy {
     }
 }
 
-pub struct PrivateProxy {}
+pub struct PrivateProxy {
+    pub sequencer_url: String,
+}
+
+impl PrivateProxy {
+    pub fn create_client(&self) -> Client<L2> {
+        let url = SensitiveUrl::from_str(&self.sequencer_url)
+            .unwrap_or_else(|_| panic!("Unable to parse client URL: {}", &self.sequencer_url));
+        Client::http(url)
+            .unwrap_or_else(|_| {
+                panic!("Unable to create a client for fork: {}", self.sequencer_url)
+            })
+            .build()
+    }
+}
 
 #[derive(Clone, Debug)]
 struct AuthInfo {
@@ -46,10 +60,18 @@ struct AuthInfo {
     password: String,
 }
 
-#[rpc(server, client, namespace = "eth")]
+#[rpc(server, client, namespace = "privateeth")]
 pub trait PrivateEthNamespace {
-    #[method(name = "privateBlockNumber")]
+    #[method(name = "blockNumber")]
     async fn private_get_block_number(&self, username: String, password: String) -> RpcResult<U64>;
+    #[method(name = "getBalance")]
+    async fn private_get_balance(
+        &self,
+        username: String,
+        password: String,
+        address: Address,
+        block: Option<BlockIdVariant>,
+    ) -> RpcResult<U256>;
 }
 
 #[async_trait]
@@ -57,6 +79,20 @@ impl PrivateEthNamespaceServer for PrivateProxy {
     async fn private_get_block_number(&self, username: String, password: String) -> RpcResult<U64> {
         println!("username: {:?} password: {:?}", username, password);
         Ok(42.into())
+    }
+
+    async fn private_get_balance(
+        &self,
+        username: String,
+        password: String,
+        address: Address,
+        block: Option<BlockIdVariant>,
+    ) -> RpcResult<U256> {
+        let client = self.create_client();
+        client
+            .get_balance(address, block)
+            .await
+            .map_err(|_| ErrorObject::from(ErrorCode::InternalError).into_owned())
     }
 }
 
@@ -277,24 +313,16 @@ impl EthNamespaceServer for Proxy {
         todo!()
     }
 
-    #[must_use]
-    #[allow(clippy::type_complexity, clippy::type_repetition_in_bounds)]
-    fn get_balance<'life0, 'async_trait>(
-        &'life0 self,
+    async fn get_balance(
+        &self,
         address: Address,
         block: Option<BlockIdVariant>,
-    ) -> ::core::pin::Pin<
-        Box<
-            dyn ::core::future::Future<Output = RpcResult<U256>>
-                + ::core::marker::Send
-                + 'async_trait,
-        >,
-    >
-    where
-        'life0: 'async_trait,
-        Self: 'async_trait,
-    {
-        todo!()
+    ) -> RpcResult<U256> {
+        let client = self.create_client();
+        client
+            .get_balance(address, block)
+            .await
+            .map_err(|_| ErrorObject::from(ErrorCode::InternalError).into_owned())
     }
 
     #[must_use]

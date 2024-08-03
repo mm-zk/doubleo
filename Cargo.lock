@@ -645,6 +645,7 @@ dependencies = [
  "http",
  "hyper",
  "jsonrpsee",
+ "once_cell",
  "serde",
  "serde_json",
  "serde_yaml",

@@ -8,6 +8,7 @@ use clap::{Parser, Subcommand};
 use futures::{channel::oneshot, future, FutureExt};
 use proxy::{PrivateEthNamespaceServer, PrivateProxy};
 use serde::{Deserialize, Serialize};
+use serde_json::{json, value::RawValue, Value};
 use tower::Service;
 use tower_http::validate_request::ValidateRequestHeaderLayer;
 use zksync_web3_decl::jsonrpsee::{
@@ -87,6 +88,17 @@ struct AuthInfo {
     password: String,
 }
 
+use once_cell::sync::Lazy;
+use std::collections::HashMap;
+
+static MY_MAP: Lazy<HashMap<&'static str, &'static str>> = Lazy::new(|| {
+    let mut m = HashMap::new();
+    m.insert("one", "a");
+    m.insert("two", "bb");
+    m.insert("three", "cc");
+    m
+});
+
 impl<S> Service<Request<Body>> for AuthMiddleware<S>
 where
     S: Service<Request<Body>, Response = Response<Body>> + Send + Clone + 'static,
@@ -135,6 +147,42 @@ where
                                         })));*/
                                     }
 
+                                    if json_rpc_request.method == "eth_getBalance" {
+                                        json_rpc_request.method = "privateeth_getBalance".into();
+                                        let prev_params = json_rpc_request.params.unwrap();
+
+                                        println!("Contents: {:?}", prev_params.get());
+                                        let mut value: Value =
+                                            serde_json::from_str(prev_params.get()).unwrap();
+
+                                        println!("Value: {:?}", value);
+                                        if let Some(aa) = value.as_array_mut() {
+                                            aa.insert(0, json!(password));
+                                            aa.insert(0, json!(username));
+                                        }
+
+                                        println!("Value after: {:?}", value);
+
+                                        /*let foo = serde_json::value::to_raw_value(&AuthInfo {
+                                            username: username.to_string(),
+                                            password: password.to_string(),
+                                        })
+                                        .unwrap();*/
+                                        let modified_json_string =
+                                            serde_json::to_string(&value).unwrap();
+
+                                        let new_raw_value =
+                                            RawValue::from_string(modified_json_string).unwrap();
+
+                                        json_rpc_request.params = Some(Cow::Owned(new_raw_value));
+
+                                        /*json_rpc_request.params =
+                                        Some(Params::new(serde_json::json!(AuthInfo {
+                                            username: username.to_string(),
+                                            password: password.to_string(),
+                                        })));*/
+                                    }
+
                                     let modified_body =
                                         serde_json::to_vec(&json_rpc_request).unwrap();
                                     let modified_req =
@@ -173,10 +221,12 @@ async fn main() -> eyre::Result<()> {
     tracing_subscriber::fmt::init();
 
     let proxy = Proxy {
-        sequencer_url: opt.sequencer_url,
+        sequencer_url: opt.sequencer_url.clone(),
     };
 
-    let private_proxy = PrivateProxy {};
+    let private_proxy = PrivateProxy {
+        sequencer_url: opt.sequencer_url,
+    };
 
     let mut rpc = RpcModule::new(());
     rpc.merge(proxy.into_rpc()).unwrap();
