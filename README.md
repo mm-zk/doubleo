@@ -13,10 +13,33 @@
 
 
 
+## Starting system against the localhost
+```shell
+cargo run -- --sequencer-url http://localhost:8011  run
+```
+
+## Adding credentials
+```shell
+curl --request POST \                                                                                                                             
+     --url http://localhost:8015 \
+     --header 'accept: application/json' \
+     --header 'content-type: application/json' \
+     --data '
+{
+  "jsonrpc": "2.0",
+  "method": "privateeth_addCredential",
+  "id": 1,
+  "params": [
+    "abcd", "0x36615Cf349d7F6344891B1e7CA7C72883F5dc049", "sth"
+  ]
+}'
+```
+
+
 ## Stuff to add
 
-* support for calls that pass your user id.
-* support for 'cookies' - plus a way to persist them over time
+* persist cookies over time
 * actual checking of the authorization
+* simple frontend
 
 

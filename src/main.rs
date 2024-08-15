@@ -3,7 +3,7 @@ use std::fs;
 use clap::{Parser, Subcommand};
 use middleware::AuthMiddlewareLayer;
 use proxy::{PrivateEthNamespaceServer, PrivateProxy};
-use serde::{Deserialize, Serialize};
+use serde::Deserialize;
 use whitelist::ContractWhitelist;
 use zksync_web3_decl::jsonrpsee::server::ServerBuilder;
 use zksync_web3_decl::{jsonrpsee::RpcModule, namespaces::EthNamespaceServer};
@@ -81,6 +81,7 @@ async fn main() -> eyre::Result<()> {
     let private_proxy = PrivateProxy {
         sequencer_url: opt.sequencer_url,
         whitelist: ContractWhitelist::init(config.whitelist),
+        credentials: Default::default(),
     };
 
     let mut rpc = RpcModule::new(());

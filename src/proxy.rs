@@ -1,4 +1,8 @@
-use std::str::FromStr;
+use std::{
+    collections::{hash_map::Entry, HashMap, HashSet},
+    str::FromStr,
+    sync::Mutex,
+};
 use zksync_types::{
     api::{
         BlockId, BlockIdVariant, BlockNumber, Transaction, TransactionReceipt, TransactionVariant,
@@ -49,6 +53,8 @@ impl Proxy {
 pub struct PrivateProxy {
     pub sequencer_url: String,
     pub whitelist: ContractWhitelist,
+
+    pub credentials: Mutex<HashMap<String, HashSet<Address>>>,
 }
 
 impl PrivateProxy {
@@ -62,11 +68,33 @@ impl PrivateProxy {
             .build()
     }
     pub fn allow_authorized_call(&self, credentials: &String, req: &CallRequest) -> bool {
-        // TODO: map credentials to users.
-        let credentials = credentials.strip_suffix(":").unwrap();
-        println!("Credentials: {}", credentials);
-        let users = [Address::from_str(credentials).unwrap()].into();
-        self.whitelist.allow_authorized_call(req, &users)
+        let allowed_users = {
+            let credentials = credentials.strip_suffix(":").unwrap_or(&credentials);
+            let data = self.credentials.lock().unwrap();
+            match data.get(credentials) {
+                Some(credentials) => credentials.clone(),
+                None => return false,
+            }
+        };
+        self.whitelist.allow_authorized_call(req, &allowed_users)
+    }
+
+    fn authorize_credential(
+        &self,
+        credentials: String,
+        address: Address,
+        signature: &String,
+    ) -> bool {
+        // TODO: verify signature.
+        let mut data = self.credentials.lock().unwrap();
+        match data.entry(credentials) {
+            Entry::Occupied(mut users) => users.get_mut().insert(address),
+            Entry::Vacant(vacant) => {
+                vacant.insert([address].into());
+                true
+            }
+        };
+        true
     }
 }
 
@@ -89,13 +117,13 @@ pub trait PrivateEthNamespace {
         block: Option<BlockIdVariant>,
     ) -> RpcResult<Bytes>;
 
-    /*#[method(name = "addcookie")]
-    async fn addcookie(
+    #[method(name = "addCredential")]
+    async fn add_credential(
         &self,
+        credentials: String,
         address: String,
-        cookie: String,
         signature: String,
-    ) -> RpcResult<bool>;*/
+    ) -> RpcResult<bool>;
 }
 
 #[async_trait]
@@ -103,6 +131,18 @@ impl PrivateEthNamespaceServer for PrivateProxy {
     async fn private_get_block_number(&self, credentials: String) -> RpcResult<U64> {
         println!("credentials: {:?} ", credentials);
         Ok(42.into())
+    }
+
+    async fn add_credential(
+        &self,
+        credentials: String,
+        address: String,
+        signature: String,
+    ) -> RpcResult<bool> {
+        let address = Address::from_str(&address)
+            .map_err(|_| ErrorObject::from(ErrorCode::InternalError).into_owned())?;
+
+        Ok(self.authorize_credential(credentials, address, &signature))
     }
 
     async fn private_get_balance(
