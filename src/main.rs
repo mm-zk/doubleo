@@ -88,7 +88,11 @@ async fn main() -> eyre::Result<()> {
     rpc.merge(proxy.into_rpc()).unwrap();
     rpc.merge(private_proxy.into_rpc()).unwrap();
 
-    let http_middleware = tower::ServiceBuilder::new().layer(AuthMiddlewareLayer {});
+    let cors_layer = tower_http::cors::CorsLayer::very_permissive();
+
+    let http_middleware = tower::ServiceBuilder::new()
+        .layer(AuthMiddlewareLayer {})
+        .layer(cors_layer);
 
     // Create the server with custom middleware
     let builder = ServerBuilder::default();

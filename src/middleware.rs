@@ -34,6 +34,29 @@ static REQUEST_AUTH_MAP: Lazy<HashMap<&'static str, &'static str>> = Lazy::new(|
     m
 });
 
+fn get_credentials_from_request(req: &Request<Body>) -> Option<String> {
+    if let Some(auth_header) = req.headers().get("authorization") {
+        if let Ok(auth_str) = auth_header.to_str() {
+            if auth_str.starts_with("Basic ") {
+                let encoded_credentials = &auth_str[6..];
+                if let Ok(decoded_credentials) = decode(encoded_credentials) {
+                    if let Ok(credentials) = String::from_utf8(decoded_credentials) {
+                        return Some(credentials);
+                    }
+                }
+            }
+        }
+    }
+
+    if let Some(path) = req.uri().path().strip_prefix("/") {
+        if !path.is_empty() {
+            return Some(path.to_string());
+        }
+    }
+
+    return None;
+}
+
 impl<S> Service<Request<Body>> for AuthMiddleware<S>
 where
     S: Service<Request<Body>, Response = Response<Body>> + Send + Clone + 'static,
@@ -50,55 +73,39 @@ where
     fn call(&mut self, req: Request<Body>) -> Self::Future {
         let mut inner = self.inner.clone();
         Box::pin(async move {
-            if let Some(auth_header) = req.headers().get("authorization") {
-                if let Ok(auth_str) = auth_header.to_str() {
-                    if auth_str.starts_with("Basic ") {
-                        let encoded_credentials = &auth_str[6..];
-                        if let Ok(decoded_credentials) = decode(encoded_credentials) {
-                            if let Ok(credentials) = String::from_utf8(decoded_credentials) {
-                                // Intercept and modify JSON-RPC requests
-                                let (parts, body) = req.into_parts();
-                                let body_bytes = hyper::body::to_bytes(body).await.unwrap();
-                                let mut json_rpc_request: JsonRpcRequest =
-                                    serde_json::from_slice(&body_bytes).unwrap();
+            if let Some(credentials) = get_credentials_from_request(&req) {
+                // Intercept and modify JSON-RPC requests
+                let (parts, body) = req.into_parts();
+                let body_bytes = hyper::body::to_bytes(body).await.unwrap();
+                let mut json_rpc_request: JsonRpcRequest =
+                    serde_json::from_slice(&body_bytes).unwrap();
 
-                                if let Some(private_method) =
-                                    REQUEST_AUTH_MAP.get(json_rpc_request.method_name())
-                                {
-                                    json_rpc_request.method = (*private_method).into();
+                if let Some(private_method) = REQUEST_AUTH_MAP.get(json_rpc_request.method_name()) {
+                    json_rpc_request.method = (*private_method).into();
 
-                                    let mut params_json =
-                                        if let Some(prev) = json_rpc_request.params {
-                                            let value: Value =
-                                                serde_json::from_str(prev.get()).unwrap();
+                    let mut params_json = if let Some(prev) = json_rpc_request.params {
+                        let value: Value = serde_json::from_str(prev.get()).unwrap();
 
-                                            value
-                                        } else {
-                                            Value::Array(vec![])
-                                        };
+                        value
+                    } else {
+                        Value::Array(vec![])
+                    };
 
-                                    if let Some(arr) = params_json.as_array_mut() {
-                                        arr.insert(0, json!(credentials));
-                                    }
-
-                                    let modified_json_string =
-                                        serde_json::to_string(&params_json).unwrap();
-
-                                    let new_raw_value =
-                                        RawValue::from_string(modified_json_string).unwrap();
-
-                                    json_rpc_request.params = Some(Cow::Owned(new_raw_value));
-                                }
-
-                                let modified_body = serde_json::to_vec(&json_rpc_request).unwrap();
-                                let modified_req =
-                                    Request::from_parts(parts, Body::from(modified_body));
-
-                                return inner.call(modified_req).await;
-                            }
-                        }
+                    if let Some(arr) = params_json.as_array_mut() {
+                        arr.insert(0, json!(credentials));
                     }
+
+                    let modified_json_string = serde_json::to_string(&params_json).unwrap();
+
+                    let new_raw_value = RawValue::from_string(modified_json_string).unwrap();
+
+                    json_rpc_request.params = Some(Cow::Owned(new_raw_value));
                 }
+
+                let modified_body = serde_json::to_vec(&json_rpc_request).unwrap();
+                let modified_req = Request::from_parts(parts, Body::from(modified_body));
+
+                return inner.call(modified_req).await;
             }
 
             inner.call(req).await
