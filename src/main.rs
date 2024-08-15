@@ -34,13 +34,26 @@ enum Command {
     Run,
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Debug, Deserialize, Clone)]
+pub struct WhitelistEntry {
+    address: String,
+    fully_whitelisted: bool,
+    methods: Option<Methods>,
+}
+
+#[derive(Debug, Deserialize, Clone)]
+pub struct Methods {
+    unrestricted: Option<Vec<String>>,
+    requires_authorization: Option<Vec<String>>,
+}
+
+#[derive(Deserialize, Debug)]
 struct Config {
     // If enabled, allows anyone to create new contracts.
     allow_contract_creation: bool,
 
     // List of contracts that can be called with 'call'.
-    contract_call_whitelist: Vec<String>,
+    whitelist: Vec<WhitelistEntry>,
 }
 
 fn parse_config(path: &str) -> eyre::Result<Config> {
@@ -62,7 +75,7 @@ async fn main() -> eyre::Result<()> {
 
     let proxy = Proxy {
         sequencer_url: opt.sequencer_url.clone(),
-        whitelist: ContractWhitelist::init(config.contract_call_whitelist),
+        whitelist: ContractWhitelist::init(config.whitelist),
     };
 
     let private_proxy = PrivateProxy {

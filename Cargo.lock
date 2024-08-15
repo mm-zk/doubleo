@@ -642,6 +642,7 @@ dependencies = [
  "clap",
  "eyre",
  "futures 0.3.30",
+ "hex",
  "http",
  "hyper",
  "jsonrpsee",

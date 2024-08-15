@@ -21,7 +21,7 @@
             },
             "args": [
                 "--sequencer-url",
-                "12",
+                "http://localhost:8011",
                 "run"
             ],
             "cwd": "${workspaceFolder}"
