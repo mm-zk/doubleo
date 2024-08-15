@@ -56,52 +56,45 @@ where
                         let encoded_credentials = &auth_str[6..];
                         if let Ok(decoded_credentials) = decode(encoded_credentials) {
                             if let Ok(credentials) = String::from_utf8(decoded_credentials) {
-                                let mut parts = credentials.splitn(2, ':');
-                                if let (Some(username), Some(password)) =
-                                    (parts.next(), parts.next())
+                                // Intercept and modify JSON-RPC requests
+                                let (parts, body) = req.into_parts();
+                                let body_bytes = hyper::body::to_bytes(body).await.unwrap();
+                                let mut json_rpc_request: JsonRpcRequest =
+                                    serde_json::from_slice(&body_bytes).unwrap();
+
+                                if let Some(private_method) =
+                                    REQUEST_AUTH_MAP.get(json_rpc_request.method_name())
                                 {
-                                    // Intercept and modify JSON-RPC requests
-                                    let (parts, body) = req.into_parts();
-                                    let body_bytes = hyper::body::to_bytes(body).await.unwrap();
-                                    let mut json_rpc_request: JsonRpcRequest =
-                                        serde_json::from_slice(&body_bytes).unwrap();
+                                    json_rpc_request.method = (*private_method).into();
 
-                                    if let Some(private_method) =
-                                        REQUEST_AUTH_MAP.get(json_rpc_request.method_name())
-                                    {
-                                        json_rpc_request.method = (*private_method).into();
+                                    let mut params_json =
+                                        if let Some(prev) = json_rpc_request.params {
+                                            let value: Value =
+                                                serde_json::from_str(prev.get()).unwrap();
 
-                                        let mut params_json =
-                                            if let Some(prev) = json_rpc_request.params {
-                                                let value: Value =
-                                                    serde_json::from_str(prev.get()).unwrap();
+                                            value
+                                        } else {
+                                            Value::Array(vec![])
+                                        };
 
-                                                value
-                                            } else {
-                                                Value::Array(vec![])
-                                            };
-
-                                        if let Some(arr) = params_json.as_array_mut() {
-                                            arr.insert(0, json!(password));
-                                            arr.insert(0, json!(username));
-                                        }
-
-                                        let modified_json_string =
-                                            serde_json::to_string(&params_json).unwrap();
-
-                                        let new_raw_value =
-                                            RawValue::from_string(modified_json_string).unwrap();
-
-                                        json_rpc_request.params = Some(Cow::Owned(new_raw_value));
+                                    if let Some(arr) = params_json.as_array_mut() {
+                                        arr.insert(0, json!(credentials));
                                     }
 
-                                    let modified_body =
-                                        serde_json::to_vec(&json_rpc_request).unwrap();
-                                    let modified_req =
-                                        Request::from_parts(parts, Body::from(modified_body));
+                                    let modified_json_string =
+                                        serde_json::to_string(&params_json).unwrap();
 
-                                    return inner.call(modified_req).await;
+                                    let new_raw_value =
+                                        RawValue::from_string(modified_json_string).unwrap();
+
+                                    json_rpc_request.params = Some(Cow::Owned(new_raw_value));
                                 }
+
+                                let modified_body = serde_json::to_vec(&json_rpc_request).unwrap();
+                                let modified_req =
+                                    Request::from_parts(parts, Body::from(modified_body));
+
+                                return inner.call(modified_req).await;
                             }
                         }
                     }

@@ -1,3 +1,4 @@
+use std::collections::HashSet;
 use std::{collections::HashMap, ops::Add};
 
 use std::str::FromStr;
@@ -74,25 +75,24 @@ impl ContractWhitelist {
         }
     }
 
-    pub fn allow_authorized_call(&self, req: &CallRequest, user: &String) -> bool {
+    pub fn allow_authorized_call(&self, req: &CallRequest, users: &HashSet<Address>) -> bool {
         if self.allow_unauthorized_call(req) {
             return true;
         }
 
         if let Some(req_user) = ContractWhitelist::get_first_user(req) {
-            if let Ok(user) = Address::from_str(user) {
-                if req_user != user {
-                    println!("User mismatch: {} vs {}", user, req_user);
-                    return false;
-                }
-                if let Some(to) = req.to {
-                    if let Some(whitelist) = self.whitelisted_contracts.get(&to) {
-                        if let Some(selector) = ContractWhitelist::get_selector(req) {
-                            if let Some(methods) = &whitelist.methods {
-                                if let Some(authorizations) = &methods.requires_authorization {
-                                    // We need more verification here..
-                                    return authorizations.contains(&selector);
-                                }
+            if !users.contains(&req_user) {
+                println!("User {} not in hashset", req_user);
+                return false;
+            }
+
+            if let Some(to) = req.to {
+                if let Some(whitelist) = self.whitelisted_contracts.get(&to) {
+                    if let Some(selector) = ContractWhitelist::get_selector(req) {
+                        if let Some(methods) = &whitelist.methods {
+                            if let Some(authorizations) = &methods.requires_authorization {
+                                // We need more verification here..
+                                return authorizations.contains(&selector);
                             }
                         }
                     }

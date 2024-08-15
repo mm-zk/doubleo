@@ -61,50 +61,53 @@ impl PrivateProxy {
             })
             .build()
     }
-    pub fn allow_authorized_call(
-        &self,
-        username: &String,
-        password: &String,
-        req: &CallRequest,
-    ) -> bool {
-        // TODO: check password.
-        self.whitelist.allow_authorized_call(req, username)
+    pub fn allow_authorized_call(&self, credentials: &String, req: &CallRequest) -> bool {
+        // TODO: map credentials to users.
+        let credentials = credentials.strip_suffix(":").unwrap();
+        println!("Credentials: {}", credentials);
+        let users = [Address::from_str(credentials).unwrap()].into();
+        self.whitelist.allow_authorized_call(req, &users)
     }
 }
 
 #[rpc(server, client, namespace = "privateeth")]
 pub trait PrivateEthNamespace {
     #[method(name = "blockNumber")]
-    async fn private_get_block_number(&self, username: String, password: String) -> RpcResult<U64>;
+    async fn private_get_block_number(&self, credentials: String) -> RpcResult<U64>;
     #[method(name = "getBalance")]
     async fn private_get_balance(
         &self,
-        username: String,
-        password: String,
+        credentials: String,
         address: Address,
         block: Option<BlockIdVariant>,
     ) -> RpcResult<U256>;
     #[method(name = "call")]
     async fn private_call(
         &self,
-        username: String,
-        password: String,
+        credentials: String,
         req: CallRequest,
         block: Option<BlockIdVariant>,
     ) -> RpcResult<Bytes>;
+
+    /*#[method(name = "addcookie")]
+    async fn addcookie(
+        &self,
+        address: String,
+        cookie: String,
+        signature: String,
+    ) -> RpcResult<bool>;*/
 }
 
 #[async_trait]
 impl PrivateEthNamespaceServer for PrivateProxy {
-    async fn private_get_block_number(&self, username: String, password: String) -> RpcResult<U64> {
-        println!("username: {:?} password: {:?}", username, password);
+    async fn private_get_block_number(&self, credentials: String) -> RpcResult<U64> {
+        println!("credentials: {:?} ", credentials);
         Ok(42.into())
     }
 
     async fn private_get_balance(
         &self,
-        username: String,
-        password: String,
+        credentials: String,
         address: Address,
         block: Option<BlockIdVariant>,
     ) -> RpcResult<U256> {
@@ -117,12 +120,11 @@ impl PrivateEthNamespaceServer for PrivateProxy {
 
     async fn private_call(
         &self,
-        username: String,
-        password: String,
+        credentials: String,
         req: CallRequest,
         block: Option<BlockIdVariant>,
     ) -> RpcResult<Bytes> {
-        if !self.allow_authorized_call(&username, &password, &req) {
+        if !self.allow_authorized_call(&credentials, &req) {
             return Err(ErrorObject::from(ErrorCode::ServerError(403)));
         }
         let client = self.create_client();
