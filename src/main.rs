@@ -75,11 +75,12 @@ async fn main() -> eyre::Result<()> {
 
     let proxy = Proxy {
         sequencer_url: opt.sequencer_url.clone(),
-        whitelist: ContractWhitelist::init(config.whitelist),
+        whitelist: ContractWhitelist::init(config.whitelist.clone()),
     };
 
     let private_proxy = PrivateProxy {
         sequencer_url: opt.sequencer_url,
+        whitelist: ContractWhitelist::init(config.whitelist),
     };
 
     let mut rpc = RpcModule::new(());

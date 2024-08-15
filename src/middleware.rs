@@ -30,7 +30,7 @@ static REQUEST_AUTH_MAP: Lazy<HashMap<&'static str, &'static str>> = Lazy::new(|
     let mut m = HashMap::new();
     m.insert("eth_getBalance", "privateeth_getBalance");
     m.insert("eth_blockNumber", "privateeth_blockNumber");
-    m.insert("three", "cc");
+    m.insert("eth_call", "privateeth_call");
     m
 });
 

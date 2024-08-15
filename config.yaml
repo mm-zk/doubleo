@@ -1,11 +1,4 @@
 "allow_contract_creation": true
-# any method can be called on these contracts
-"contract_call_whitelist":
-- "0xbc989fde9e54cad2ab4392af6df60f04873a033a"
-- "0x111C3E89Ce80e62EE88318C2804920D4c96f92bb"
-# for now.
-- "0x26b368C3Ed16313eBd6660b72d8e4439a697Cb0B"
-
 
 
 whitelist:
@@ -16,20 +9,8 @@ whitelist:
     fully_whitelisted: false
     methods:
       unrestricted:
-      # balanceOf(address)
-        - "70a08231"
       # totalSupply()
         - "18160ddd"
       requires_authorization:
-        - "methodC"
-        - "methodD"
-        - foobar()
-        - 0x12345
-
-  - address: "0xbc989fde9e54cad2ab4392af6df60f04873a033a"
-    fully_whitelisted: false
-    methods:
-      unrestricted:
-        - "methodX"
-      requires_authorization:
-        - "methodY"
+        # balanceOf(address)
+        - "70a08231"

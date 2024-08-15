@@ -48,6 +48,7 @@ impl Proxy {
 
 pub struct PrivateProxy {
     pub sequencer_url: String,
+    pub whitelist: ContractWhitelist,
 }
 
 impl PrivateProxy {
@@ -59,6 +60,15 @@ impl PrivateProxy {
                 panic!("Unable to create a client for fork: {}", self.sequencer_url)
             })
             .build()
+    }
+    pub fn allow_authorized_call(
+        &self,
+        username: &String,
+        password: &String,
+        req: &CallRequest,
+    ) -> bool {
+        // TODO: check password.
+        self.whitelist.allow_authorized_call(req, username)
     }
 }
 
@@ -74,6 +84,14 @@ pub trait PrivateEthNamespace {
         address: Address,
         block: Option<BlockIdVariant>,
     ) -> RpcResult<U256>;
+    #[method(name = "call")]
+    async fn private_call(
+        &self,
+        username: String,
+        password: String,
+        req: CallRequest,
+        block: Option<BlockIdVariant>,
+    ) -> RpcResult<Bytes>;
 }
 
 #[async_trait]
@@ -93,6 +111,23 @@ impl PrivateEthNamespaceServer for PrivateProxy {
         let client = self.create_client();
         client
             .get_balance(address, block)
+            .await
+            .map_err(|_| ErrorObject::from(ErrorCode::InternalError).into_owned())
+    }
+
+    async fn private_call(
+        &self,
+        username: String,
+        password: String,
+        req: CallRequest,
+        block: Option<BlockIdVariant>,
+    ) -> RpcResult<Bytes> {
+        if !self.allow_authorized_call(&username, &password, &req) {
+            return Err(ErrorObject::from(ErrorCode::ServerError(403)));
+        }
+        let client = self.create_client();
+        client
+            .call(req, block)
             .await
             .map_err(|_| ErrorObject::from(ErrorCode::InternalError).into_owned())
     }

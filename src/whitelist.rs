@@ -1,7 +1,7 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, ops::Add};
 
 use std::str::FromStr;
-use zksync_types::{transaction_request::CallRequest, Address};
+use zksync_types::{protocol_upgrade::Call, transaction_request::CallRequest, Address};
 
 use crate::WhitelistEntry;
 
@@ -20,6 +20,28 @@ impl ContractWhitelist {
             ),
         }
     }
+
+    fn get_selector(req: &CallRequest) -> Option<String> {
+        req.data.as_ref().map(|input| hex::encode(&input.0[..4]))
+    }
+
+    fn get_first_user(req: &CallRequest) -> Option<Address> {
+        if req.data.is_none() {
+            return None;
+        }
+        let input = req.data.as_ref().unwrap();
+
+        for i in 4..16 {
+            if input.0[i] != 0 {
+                return None;
+            }
+        }
+
+        let first_param = &input.0[16..36];
+
+        Some(Address::from_slice(first_param))
+    }
+
     pub fn allow_unauthorized_call(&self, req: &CallRequest) -> bool {
         if let Some(to) = req.to {
             // Contract must be on the whitelist
@@ -28,7 +50,7 @@ impl ContractWhitelist {
                     if whitelist_entry.fully_whitelisted {
                         true
                     } else {
-                        let selector = req.data.as_ref().map(|input| hex::encode(&input.0[..4]));
+                        let selector = ContractWhitelist::get_selector(req);
                         match selector {
                             Some(selector) => {
                                 println!("looking at selector {}", selector);
@@ -50,5 +72,33 @@ impl ContractWhitelist {
             // Calls to 'null' address (eth contract creation) not allowed.
             false
         }
+    }
+
+    pub fn allow_authorized_call(&self, req: &CallRequest, user: &String) -> bool {
+        if self.allow_unauthorized_call(req) {
+            return true;
+        }
+
+        if let Some(req_user) = ContractWhitelist::get_first_user(req) {
+            if let Ok(user) = Address::from_str(user) {
+                if req_user != user {
+                    println!("User mismatch: {} vs {}", user, req_user);
+                    return false;
+                }
+                if let Some(to) = req.to {
+                    if let Some(whitelist) = self.whitelisted_contracts.get(&to) {
+                        if let Some(selector) = ContractWhitelist::get_selector(req) {
+                            if let Some(methods) = &whitelist.methods {
+                                if let Some(authorizations) = &methods.requires_authorization {
+                                    // We need more verification here..
+                                    return authorizations.contains(&selector);
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        return false;
     }
 }
