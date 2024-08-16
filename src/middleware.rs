@@ -75,37 +75,46 @@ where
         Box::pin(async move {
             if let Some(credentials) = get_credentials_from_request(&req) {
                 // Intercept and modify JSON-RPC requests
+                let uri = req.uri().clone();
                 let (parts, body) = req.into_parts();
                 let body_bytes = hyper::body::to_bytes(body).await.unwrap();
-                let mut json_rpc_request: JsonRpcRequest =
-                    serde_json::from_slice(&body_bytes).unwrap();
 
-                if let Some(private_method) = REQUEST_AUTH_MAP.get(json_rpc_request.method_name()) {
-                    json_rpc_request.method = (*private_method).into();
+                if body_bytes.len() > 0 {
+                    let mut json_rpc_request: JsonRpcRequest = serde_json::from_slice(&body_bytes)
+                        .expect(&format!("Failed to parse {:?}  {:?}", uri, body_bytes));
 
-                    let mut params_json = if let Some(prev) = json_rpc_request.params {
-                        let value: Value = serde_json::from_str(prev.get()).unwrap();
+                    if let Some(private_method) =
+                        REQUEST_AUTH_MAP.get(json_rpc_request.method_name())
+                    {
+                        json_rpc_request.method = (*private_method).into();
 
-                        value
-                    } else {
-                        Value::Array(vec![])
-                    };
+                        let mut params_json = if let Some(prev) = json_rpc_request.params {
+                            let value: Value = serde_json::from_str(prev.get()).unwrap();
 
-                    if let Some(arr) = params_json.as_array_mut() {
-                        arr.insert(0, json!(credentials));
+                            value
+                        } else {
+                            Value::Array(vec![])
+                        };
+
+                        if let Some(arr) = params_json.as_array_mut() {
+                            arr.insert(0, json!(credentials));
+                        }
+
+                        let modified_json_string = serde_json::to_string(&params_json).unwrap();
+
+                        let new_raw_value = RawValue::from_string(modified_json_string).unwrap();
+
+                        json_rpc_request.params = Some(Cow::Owned(new_raw_value));
                     }
 
-                    let modified_json_string = serde_json::to_string(&params_json).unwrap();
+                    let modified_body = serde_json::to_vec(&json_rpc_request).unwrap();
+                    let modified_req = Request::from_parts(parts, Body::from(modified_body));
 
-                    let new_raw_value = RawValue::from_string(modified_json_string).unwrap();
-
-                    json_rpc_request.params = Some(Cow::Owned(new_raw_value));
+                    return inner.call(modified_req).await;
+                } else {
+                    let modified_req = Request::from_parts(parts, Body::from(vec![]));
+                    return inner.call(modified_req).await;
                 }
-
-                let modified_body = serde_json::to_vec(&json_rpc_request).unwrap();
-                let modified_req = Request::from_parts(parts, Body::from(modified_body));
-
-                return inner.call(modified_req).await;
             }
 
             inner.call(req).await
