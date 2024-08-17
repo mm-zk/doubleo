@@ -31,6 +31,9 @@ impl ContractWhitelist {
             return None;
         }
         let input = req.data.as_ref().unwrap();
+        if input.0.len() < 36 {
+            return None;
+        }
 
         for i in 4..16 {
             if input.0[i] != 0 {

@@ -96,6 +96,14 @@ impl PrivateProxy {
         };
         true
     }
+
+    fn check_credential_internal(&self, credentials: &String, address: &Address) -> bool {
+        let data = self.credentials.lock().unwrap();
+
+        data.get(credentials)
+            .map(|x| x.contains(address))
+            .unwrap_or(false)
+    }
 }
 
 #[rpc(server, client, namespace = "privateeth")]
@@ -124,6 +132,9 @@ pub trait PrivateEthNamespace {
         address: String,
         signature: String,
     ) -> RpcResult<bool>;
+
+    #[method(name = "checkCredential")]
+    async fn check_credential(&self, credentials: String, address: String) -> RpcResult<bool>;
 }
 
 #[async_trait]
@@ -145,6 +156,12 @@ impl PrivateEthNamespaceServer for PrivateProxy {
         Ok(self.authorize_credential(credentials, address, &signature))
     }
 
+    async fn check_credential(&self, credentials: String, address: String) -> RpcResult<bool> {
+        let address = Address::from_str(&address)
+            .map_err(|_| ErrorObject::from(ErrorCode::InternalError).into_owned())?;
+        Ok(self.check_credential_internal(&credentials, &address))
+    }
+
     async fn private_get_balance(
         &self,
         credentials: String,
@@ -152,6 +169,9 @@ impl PrivateEthNamespaceServer for PrivateProxy {
         block: Option<BlockIdVariant>,
     ) -> RpcResult<U256> {
         let client = self.create_client();
+        if !self.check_credential_internal(&credentials, &address) {
+            return Err(ErrorObject::from(ErrorCode::ServerError(403)));
+        }
         client
             .get_balance(address, block)
             .await

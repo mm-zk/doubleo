@@ -41,5 +41,3 @@ curl --request POST \
 * persist cookies over time
 * actual checking of the authorization
 * simple frontend
-
-
