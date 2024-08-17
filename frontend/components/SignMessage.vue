@@ -61,7 +61,7 @@ const { result, execute: signMessage, inProgress, error} = useAsync(async () => 
    });
 
 
-  const res = await axios.post('http://localhost:8015', json, {
+  const res = await axios.post(DOUBLE_ZERO_SERVER_PREFIX, json, {
     headers: {
       'Content-Type': 'application/json'
     }

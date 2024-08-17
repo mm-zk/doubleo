@@ -19,10 +19,10 @@ const generateDZeroNetwork = (creds: String) => {
     nativeCurrency: { name: 'Ether', symbol: 'ETH', decimals: 18 },
     rpcUrls: {
       default: {
-        http: ['http://localhost:8015/' + creds],
+        http: [DOUBLE_ZERO_SERVER_PREFIX + creds],
       },
       public: {
-        http: ['http://localhost:8015/' + creds],
+        http: [DOUBLE_ZERO_SERVER_PREFIX + creds],
       },
     },
     blockExplorers: {
