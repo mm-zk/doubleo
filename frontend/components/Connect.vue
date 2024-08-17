@@ -5,6 +5,7 @@
     </button>
 
     <template v-else>
+      Please connect your wallet first - so that we can tell the server which accounts are allowed to use this credential.<br>
       <button v-for="item in config.connectors" :key="item.id" @click="connect({ connector: item })">
         {{ item.name }}
       </button>

@@ -9,11 +9,15 @@
 </template>
 
 <script lang="ts" setup>
-import { readContract } from '@wagmi/core';
+import { erc20ABI, readContract } from '@wagmi/core';
+
+const props = defineProps<{ contractAddress: `0x${string}` }>();
+
 
 const { result: supply, execute: fetchTotalSupply, inProgress, error} = useAsync(async () => {
   return await readContract({
-    ...daiContractConfig,
+    address: props.contractAddress,
+    abi: erc20ABI,
     functionName: 'totalSupply',
   })
 });
